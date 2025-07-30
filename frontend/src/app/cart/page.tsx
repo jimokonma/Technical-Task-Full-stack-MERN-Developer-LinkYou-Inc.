@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import { formatPrice } from '@/lib/utils';
+import { productAPI } from '@/lib/api';
+import { Product } from '@/types';
 import { Trash2, Minus, Plus, ShoppingCart, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
@@ -15,12 +17,71 @@ export default function CartPage() {
   const { user } = useAuth();
   const { showSuccess, showError, showInfo } = useToast();
   const router = useRouter();
+  const [productDetails, setProductDetails] = useState<{ [key: string]: Product }>({});
+  const [loadingProducts, setLoadingProducts] = useState(false);
 
   useEffect(() => {
     if (!user) {
       router.push('/login');
     }
   }, [user, router]);
+
+  // Load product details for cart items
+  useEffect(() => {
+    if (cart && cart.items.length > 0) {
+      loadProductDetails();
+    }
+  }, [cart]);
+
+  const loadProductDetails = async () => {
+    if (!cart || cart.items.length === 0) return;
+
+    // Debug: Log cart items to see the structure
+    console.log('Cart items:', cart.items);
+    console.log('First item productId:', cart.items[0]?.productId, typeof cart.items[0]?.productId);
+
+    try {
+      setLoadingProducts(true);
+      const productIds = cart.items.map(item => {
+        // Ensure productId is a string
+        const productId = item.productId;
+        if (typeof productId === 'string') {
+          return productId;
+        } else if (typeof productId === 'object' && productId && '_id' in productId) {
+          return (productId as any)._id;
+        } else {
+          return String(productId);
+        }
+      });
+      const details: { [key: string]: Product } = {};
+
+      // Load each product detail
+      for (const productId of productIds) {
+        if (!productId || productId === 'undefined' || productId === 'null') {
+          console.warn('Skipping invalid product ID:', productId);
+          continue;
+        }
+        
+        try {
+          const response = await productAPI.getProduct(productId);
+          details[productId] = response.data.product;
+        } catch (error) {
+          console.error(`Failed to load product ${productId}:`, error);
+          showError('Product Load Failed', `Could not load details for one or more products`);
+        }
+      }
+
+      setProductDetails(details);
+      if (Object.keys(details).length > 0) {
+        showSuccess('Cart Loaded', 'Product details loaded successfully');
+      }
+    } catch (error) {
+      console.error('Failed to load product details:', error);
+      showError('Load Failed', 'Failed to load product details');
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
 
   if (!user) {
     return null;
@@ -111,6 +172,11 @@ export default function CartPage() {
               Start Shopping
             </Link>
           </div>
+        ) : loadingProducts ? (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading product details...</p>
+          </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Cart Items */}
@@ -131,55 +197,71 @@ export default function CartPage() {
                 </div>
 
                 <div className="divide-y divide-gray-200">
-                  {cart.items.map((item) => (
-                    <div key={item.productId} className="p-6">
-                      <div className="flex items-center space-x-4">
-                        {/* Product Image */}
-                        <div className="flex-shrink-0 w-20 h-20 bg-gray-200 rounded-lg overflow-hidden">
-                          {item.product?.images && item.product.images.length > 0 ? (
-                            <img
-                              src={item.product.images[0]}
-                              alt={item.product.name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
-                              No Image
-                            </div>
-                          )}
-                        </div>
+                  {cart.items.map((item) => {
+                    // Ensure productId is a string for lookup
+                    const productId = typeof item.productId === 'string' ? item.productId : 
+                                     typeof item.productId === 'object' && item.productId && '_id' in item.productId ? 
+                                     (item.productId as any)._id : String(item.productId);
+                    const product = productDetails[productId];
+                    return (
+                      <div key={productId} className="p-6">
+                        <div className="flex items-center space-x-4">
+                          {/* Product Image */}
+                          <div className="flex-shrink-0 w-20 h-20 bg-gray-200 rounded-lg overflow-hidden">
+                            {product?.images && product.images.length > 0 ? (
+                              <img
+                                src={product.images[0]}
+                                alt={product.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
+                                {loadingProducts ? 'Loading...' : 'No Image'}
+                              </div>
+                            )}
+                          </div>
 
-                        {/* Product Details */}
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-lg font-medium text-gray-900 truncate">
-                            {item.product?.name || 'Product Name'}
-                          </h3>
-                          <p className="text-sm text-gray-500 truncate">
-                            {item.product?.description || 'Product description'}
-                          </p>
-                          <p className="text-sm text-gray-500">
-                            Price: {formatPrice(item.priceAtAdd)}
-                          </p>
-                        </div>
+                          {/* Product Details */}
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-lg font-medium text-gray-900 truncate">
+                              {product?.name || 'Product Unavailable'}
+                            </h3>
+                            <p className="text-sm text-gray-500 truncate">
+                              {product?.description || 'Product details could not be loaded'}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              Price: {formatPrice(item.priceAtAdd)}
+                            </p>
+                            {product && (
+                              <p className="text-xs text-gray-400">
+                                Category: {product.category}
+                              </p>
+                            )}
+                            {!product && (
+                              <p className="text-xs text-red-400">
+                                Product may have been removed
+                              </p>
+                            )}
+                          </div>
 
                         {/* Quantity Controls */}
                         <div className="flex items-center space-x-2">
                           <button
-                            onClick={() => handleQuantityChange(item.productId, item.quantity - 1)}
+                            onClick={() => handleQuantityChange(productId, item.quantity - 1)}
                             disabled={item.quantity <= 1}
                             className="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                           >
-                            <Minus className="w-4 h-4" />
+                            <Minus className="w-4 h-4 text-gray-800" />
                           </button>
-                          <span className="w-12 text-center font-medium">
+                          <span className="w-12 text-center font-medium text-gray-900">
                             {item.quantity}
                           </span>
                           <button
-                            onClick={() => handleQuantityChange(item.productId, item.quantity + 1)}
-                            disabled={item.quantity >= (item.product?.stock || 0)}
+                            onClick={() => handleQuantityChange(productId, item.quantity + 1)}
+                            disabled={item.quantity >= (product?.stock || 0)}
                             className="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                           >
-                            <Plus className="w-4 h-4" />
+                            <Plus className="w-4 h-4 text-gray-800" />
                           </button>
                         </div>
 
@@ -192,14 +274,15 @@ export default function CartPage() {
 
                         {/* Remove Button */}
                         <button
-                          onClick={() => handleRemoveItem(item.productId)}
+                          onClick={() => handleRemoveItem(productId)}
                           className="text-red-600 hover:text-red-700 p-2"
                         >
                           <Trash2 className="w-5 h-5" />
                         </button>
                       </div>
                     </div>
-                  ))}
+                  );
+                })}
                 </div>
               </div>
             </div>

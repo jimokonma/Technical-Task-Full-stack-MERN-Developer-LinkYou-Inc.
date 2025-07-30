@@ -2,7 +2,7 @@
 
 import { Product } from '@/types';
 import { formatPrice, getStockStatus, truncateText } from '@/lib/utils';
-import { ShoppingCart, Star } from 'lucide-react';
+import { ShoppingCart, Star, Minus, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -151,15 +151,15 @@ export default function ProductCard({ product }: ProductCardProps) {
                   disabled={quantity <= 1}
                   className="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                 >
-                  -
+                  <Minus className="w-4 h-4 text-gray-800" />
                 </button>
-                <span className="w-12 text-center font-medium">{quantity}</span>
+                <span className="w-12 text-center font-medium text-gray-900">{quantity}</span>
                 <button
                   onClick={() => handleQuantityChange(quantity + 1)}
                   disabled={quantity >= product.stock}
                   className="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                 >
-                  +
+                  <Plus className="w-4 h-4 text-gray-800" />
                 </button>
               </div>
 

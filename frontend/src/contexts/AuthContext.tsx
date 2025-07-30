@@ -38,28 +38,40 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         const token = localStorage.getItem('token');
         const storedUser = localStorage.getItem('user');
-        
+
         if (token && storedUser) {
           // First, try to restore user from localStorage for immediate UI
           const user = JSON.parse(storedUser);
           setUser(user);
-          
+
           // Then try to validate with the server in the background
           try {
             const response = await authAPI.getProfile();
             const freshUser = response.data.user;
             setUser(freshUser);
             localStorage.setItem('user', JSON.stringify(freshUser));
-          } catch (serverError) {
-            console.warn('Server validation failed, but keeping local session:', serverError);
-            // Don't log out the user if server is unreachable
-            // The API interceptor will handle token expiration
+          } catch (serverError: any) {
+            // If server returns 401, log out
+            if (serverError?.response?.status === 401) {
+              localStorage.removeItem('token');
+              localStorage.removeItem('refreshToken');
+              localStorage.removeItem('user');
+              setUser(null);
+            } else {
+              // Don't log out the user if server is unreachable
+              // The API interceptor will handle token expiration
+              console.warn('Server validation failed, but keeping local session:', serverError);
+            }
           }
+        } else {
+          // Explicitly set user to null if not found in localStorage
+          setUser(null);
         }
       } catch (error) {
         console.error('Auth check failed:', error);
         // Only clear storage if there's a parsing error
         localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
         setUser(null);
       } finally {
