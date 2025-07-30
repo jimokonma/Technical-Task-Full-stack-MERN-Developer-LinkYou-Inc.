@@ -337,4 +337,6 @@ For support, email support@cartsystem.com or create an issue in the repository.
 - TailwindCSS for the utility-first CSS
 - MongoDB for the database
 - All contributors and maintainers #   T e c h n i c a l - T a s k - F u l l - s t a c k - M E R N - D e v e l o p e r - L i n k Y o u - I n c .  
+ #   T e c h n i c a l - T a s k - F u l l - s t a c k - M E R N - D e v e l o p e r - L i n k Y o u - I n c .  
+ #   T e c h n i c a l - T a s k - F u l l - s t a c k - M E R N - D e v e l o p e r - L i n k Y o u - I n c .  
  
